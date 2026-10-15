@@ -1,0 +1,592 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Cafés on a Lattice</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: lab bench. Lattice and playback on the left, dials on the right, instruments (time series) below, then the sweep and the model spec. */
+:root{
+  --bg:#f1f4f3; --surface:#ffffff; --ink:#16201e; --muted:#5a6a66; --line:#d3dbd8;
+  --cell:#e4eae8; --accent:#0d6b67; --accent-ink:#ffffff; --pos:#2c5ea8; --neg:#c4611c;
+  --display:"Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
+  --body:"IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#101615; --surface:#172020; --ink:#e2eae8; --muted:#92a29e; --line:#2a3634;
+  --cell:#1c2625; --accent:#4cb5ad; --accent-ink:#06201e; --pos:#6d99e0; --neg:#e88c4a; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#101615; --surface:#172020; --ink:#e2eae8; --muted:#92a29e; --line:#2a3634;
+  --cell:#1c2625; --accent:#4cb5ad; --accent-ink:#06201e; --pos:#6d99e0; --neg:#e88c4a; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:1240px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:28px 72px;display:flex;flex-direction:column;gap:40px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;font-weight:700;letter-spacing:-0.01em}
+h1{font-size:clamp(2rem,5vw,3.1rem);line-height:1.02}
+h2{font-size:1.45rem}
+h3{font-size:1rem;font-weight:600;font-family:var(--body);letter-spacing:0}
+p{margin:0}
+.eyebrow{font-family:var(--mono);font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+
+header.top{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:28px;align-items:end}
+header.top .lede{max-width:62ch;color:var(--ink)}
+header.top .title{display:flex;flex-direction:column;gap:12px}
+@media (max-width:820px){header.top{grid-template-columns:1fr}}
+
+.lab{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:28px;align-items:start}
+@media (max-width:920px){.lab{grid-template-columns:1fr}}
+
+.stage{display:flex;flex-direction:column;gap:14px;min-width:0}
+.viewbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:transparent;color:var(--muted);font:500 .85rem var(--body);padding:7px 12px;cursor:pointer}
+.seg button + button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.canvas-box{position:relative;width:100%;max-width:100%;aspect-ratio:1/1;background:var(--cell);border-radius:6px;overflow:hidden;touch-action:none}
+#grid{width:100%;height:100%;display:block;cursor:crosshair}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:.82rem;color:var(--muted);min-height:22px}
+.legend .bar{width:120px;height:10px;border-radius:2px}
+.legend .sw{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:6px}
+
+.playback{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{font:600 .9rem var(--body);border-radius:8px;padding:9px 16px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);min-width:92px}
+.btn:disabled{opacity:.5;cursor:default}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.status{font-family:var(--mono);font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.progress{height:4px;background:var(--line);border-radius:2px;overflow:hidden;width:100%}
+.progress > div{height:100%;background:var(--accent);width:0%}
+
+.inspector{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:var(--surface);font-size:.88rem;min-height:86px}
+.inspector dl{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px 16px;margin:8px 0 0}
+.inspector dt{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.inspector dd{margin:0;font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+.panel{display:flex;flex-direction:column;gap:22px;min-width:0}
+.group{display:flex;flex-direction:column;gap:14px;padding-bottom:20px;border-bottom:1px solid var(--line)}
+.group:last-child{border-bottom:0}
+.group-head{display:flex;flex-direction:column;gap:2px}
+.group-head .tag{font-family:var(--mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase}
+.tag.local{color:var(--pos)} .tag.labour{color:var(--neg)} .tag.econ,.tag.run{color:var(--muted)}
+.ctl{display:flex;flex-direction:column;gap:4px}
+.ctl .row{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.ctl label{font-weight:500;font-size:.9rem}
+.ctl .val{font-family:var(--mono);font-size:.88rem;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ctl .help{font-size:.8rem;color:var(--muted);line-height:1.4}
+input[type=range]{width:100%;accent-color:var(--accent);margin:2px 0}
+.inline{display:flex;gap:10px;align-items:center}
+.inline input[type=range]{flex:1;min-width:0}
+input[type=number],select{font:500 .88rem var(--mono);background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+input[type=number]{width:84px}
+.twocol{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.presets{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font:500 .82rem var(--body);border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:5px 12px;cursor:pointer}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.reset-note{font-size:.76rem;color:var(--muted)}
+
+section.block{display:flex;flex-direction:column;gap:16px}
+.block-head{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:end}
+.block-head .sub{max-width:68ch;color:var(--muted);font-size:.92rem;margin-top:4px}
+.charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:700px){.charts{grid-template-columns:1fr}}
+.chart{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px 8px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.chart .head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.chart .now{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.95rem}
+.chart .cap{font-size:.78rem;color:var(--muted)}
+.chart canvas{width:100%;height:150px;display:block}
+
+.sweep{display:grid;grid-template-columns:minmax(240px,320px) minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:820px){.sweep{grid-template-columns:1fr}}
+.sweep-ctl{display:flex;flex-direction:column;gap:12px}
+.sweep-ctl .field{display:flex;flex-direction:column;gap:4px}
+.sweep-ctl .field label{font-size:.85rem;font-weight:500}
+.sweep-plot{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;min-width:0;display:flex;flex-direction:column;gap:8px}
+.sweep-plot canvas{width:100%;height:280px;display:block}
+.copy-fallback{width:100%;height:90px;font:.75rem var(--mono);background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:6px}
+
+.notes{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:32px}
+@media (max-width:820px){.notes{grid-template-columns:1fr}}
+.notes article{display:flex;flex-direction:column;gap:12px;max-width:66ch}
+.notes p,.notes li{font-size:.95rem}
+.notes ul{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:10px}
+.eq{font-family:var(--mono);font-size:.86rem;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 12px;overflow-x:auto;white-space:nowrap}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="title">
+      <span class="eyebrow">Research methods seminar · cellular automaton</span>
+      <h1>Cafés on a Lattice</h1>
+    </div>
+    <p class="lede">Two cafés three blocks apart fight over the same morning customers. Two cafés at opposite ends of town never share a customer, but they may well be trying to hire the same barista. This model puts both kinds of competition on one grid. Customer competition is local, and you set how far it reaches. Labour competition is regional: every café hires from one pool. The question for the seminar is which mechanism decides how many cafés survive, and which decides where they sit.</p>
+  </header>
+
+  <main class="lab">
+    <section class="stage" aria-label="Simulation">
+      <div class="viewbar">
+        <div class="seg" role="group" aria-label="Map view">
+          <button id="v-profit" aria-pressed="true">Profit</button>
+          <button id="v-market" aria-pressed="false">Market areas</button>
+          <button id="v-lost" aria-pressed="false">Lost customers</button>
+        </div>
+        <span class="status" id="status">Period 0 of 300</span>
+      </div>
+      <div class="canvas-box"><canvas id="grid" aria-label="Lattice of cafés"></canvas></div>
+      <div class="legend" id="legend"></div>
+      <div class="progress" aria-hidden="true"><div id="prog"></div></div>
+      <div class="playback">
+        <button class="btn primary" id="run">Run</button>
+        <button class="btn" id="step">Step</button>
+        <button class="btn" id="reset">Reset</button>
+        <button class="btn" id="newseed">New seed</button>
+        <span class="status" id="runnote"></span>
+      </div>
+      <div class="inspector" id="inspector" aria-live="polite">
+        <h3>Inspect a square</h3>
+        <p class="muted" style="font-size:.85rem;margin-top:4px">Hover over the map, or tap a square to pin it. The ring shows how far that square's customers will walk.</p>
+      </div>
+    </section>
+
+    <aside class="panel" aria-label="Parameters">
+      <div class="group" id="g-local">
+        <div class="group-head"><span class="tag local">Customers · local</span><h3>Competition for customers</h3></div>
+      </div>
+      <div class="group" id="g-labour">
+        <div class="group-head"><span class="tag labour">Workers · non-local</span><h3>Competition for labour</h3></div>
+      </div>
+      <div class="group" id="g-econ">
+        <div class="group-head"><span class="tag econ">Café economics</span><h3>Costs, entry and exit</h3></div>
+      </div>
+      <div class="group" id="g-run">
+        <div class="group-head"><span class="tag run">Run</span><h3>Time and setup</h3></div>
+        <div class="ctl">
+          <div class="row"><label for="T">Periods to simulate</label><span class="val" id="T-val">300</span></div>
+          <div class="inline"><input type="range" id="T" min="1" max="1000" step="1" value="300"><input type="number" id="T-num" min="1" max="1000" step="1" value="300" aria-label="Periods (number)"></div>
+        </div>
+        <div class="twocol">
+          <div class="ctl"><label for="speed">Speed</label>
+            <select id="speed"><option value="1">1 period / frame</option><option value="5">5 / frame</option><option value="25">25 / frame</option><option value="max">As fast as possible</option></select></div>
+          <div class="ctl"><label for="seed">Random seed</label><input type="number" id="seed" value="2026" min="1" step="1"></div>
+        </div>
+        <div class="twocol">
+          <div class="ctl"><label for="N">Grid size</label>
+            <select id="N"><option value="40">40 × 40</option><option value="60" selected>60 × 60</option><option value="80">80 × 80</option></select></div>
+          <div class="ctl"><div class="row"><label for="density">Starting density</label><span class="val" id="density-val">4%</span></div>
+            <input type="range" id="density" min="0" max="0.2" step="0.01" value="0.04"></div>
+        </div>
+        <p class="reset-note">Grid size, starting density and seed take effect on Reset. Everything else applies live, so you can change a dial mid-run and watch the system respond.</p>
+        <div class="ctl"><label>Scenarios <span class="muted" style="font-weight:400">(resets with the current seed)</span></label>
+          <div class="presets">
+            <button class="chip" data-preset="base">Baseline</button>
+            <button class="chip" data-preset="wide">Wide reach</button>
+            <button class="chip" data-preset="tight">Tight labour market</button>
+            <button class="chip" data-preset="foot">Footloose customers</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <section class="block" aria-labelledby="ts-h">
+    <div class="block-head">
+      <div><h2 id="ts-h">What the run is doing</h2><p class="sub">One point per period. The horizontal axis runs to the number of periods you set.</p></div>
+      <button class="btn" id="copy-run">Copy run data (CSV)</button>
+    </div>
+    <textarea class="copy-fallback" id="run-fallback" hidden readonly aria-label="Run data CSV"></textarea>
+    <div class="charts">
+      <div class="chart"><div class="head"><h3>Cafés open</h3><span class="now" id="n-cafes">–</span></div><span class="cap">Count of occupied squares at the end of each period.</span><canvas id="c-cafes"></canvas></div>
+      <div class="chart"><div class="head"><h3>Regional wage</h3><span class="now" id="n-wage">–</span></div><span class="cap">Dashed line is the base wage of 8, where labour demand equals the pool.</span><canvas id="c-wage"></canvas></div>
+      <div class="chart"><div class="head"><h3>Spacing index</h3><span class="now" id="n-spacing">–</span></div><span class="cap">Clark–Evans ratio. 1 is a random pattern; above 1, evenly spaced; below 1, clustered.</span><canvas id="c-spacing"></canvas></div>
+      <div class="chart"><div class="head"><h3>Turnover</h3><span class="now" id="n-turn">–</span></div><span class="cap"><span class="sw" style="display:inline-block;width:10px;height:3px;background:var(--pos);vertical-align:middle"></span> entries &nbsp; <span style="display:inline-block;width:10px;height:3px;background:var(--neg);vertical-align:middle"></span> exits per period</span><canvas id="c-turn"></canvas></div>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="sw-h">
+    <div class="block-head">
+      <div><h2 id="sw-h">Parameter sweep</h2><p class="sub">One run never settles anything. The sweep runs the model without drawing it, across values of one parameter, with replications, holding every other dial at its current setting. The same seeds are reused at each value, so differences between values are not just different luck. Each dot is one run, averaged over its last quarter of periods; the line joins the means. Sweeps use a 40 × 40 grid to stay quick.</p></div>
+    </div>
+    <div class="sweep">
+      <div class="sweep-ctl">
+        <div class="field"><label for="sw-var">Vary</label>
+          <select id="sw-var"><option value="R">Reach R (1–8)</option><option value="labour">Labour pool (10–70)</option><option value="beta">Distance decay β (0–2)</option><option value="F">Fixed cost F (10–50)</option></select></div>
+        <div class="twocol">
+          <div class="field"><label for="sw-reps">Replications</label><select id="sw-reps"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></div>
+          <div class="field"><label for="sw-T">Periods per run</label><select id="sw-T"><option>100</option><option>200</option><option selected>300</option><option>500</option><option>1000</option></select></div>
+        </div>
+        <div class="field"><label for="sw-out">Show outcome</label>
+          <select id="sw-out"><option value="density">Cafés per 100 squares</option><option value="spacing">Spacing index</option><option value="wage">Regional wage</option><option value="served">Demand served (%)</option></select></div>
+        <div class="playback"><button class="btn primary" id="sw-run">Run sweep</button><button class="btn" id="sw-copy" disabled>Copy results (CSV)</button></div>
+        <span class="status" id="sw-status">Not run yet.</span>
+        <div class="progress" aria-hidden="true"><div id="sw-prog"></div></div>
+        <textarea class="copy-fallback" id="sw-fallback" hidden readonly aria-label="Sweep CSV"></textarea>
+      </div>
+      <div class="sweep-plot"><div class="head"><h3 id="sw-title">Sweep results</h3></div><canvas id="sw-canvas"></canvas></div>
+    </div>
+  </section>
+
+  <section class="notes" aria-label="Model notes">
+    <article>
+      <span class="eyebrow">Specification</span>
+      <h2>How the model works</h2>
+      <p>Each square is a city block with ten potential customers per period. A square holds one café or none. Two forces act on every café in every period, and they act at different spatial scales. That difference is the point of the model.</p>
+      <p><strong>Customers are local.</strong> A customer considers only cafés whose square lies within the reach R (squares whose centres sit within R + ½ of their own). Each café in reach pulls with a weight that falls with distance d, scaled by the café's own attractiveness a, drawn between 0.6 and 1.4 when it opens. Staying home has a fixed weight of 0.5, so customers far from any café buy nothing. Each option gets its weight's share of the customers.</p>
+      <div class="eq">weight = a · (1 + d)<sup>−β</sup> &nbsp;&nbsp; share<sub>i</sub> = weight<sub>i</sub> / (0.5 + Σ weights in reach)</div>
+      <p><strong>Labour is not local.</strong> All cafés hire from one regional pool. A café needs one worker per 20 customers. When cafés jointly want more workers than the pool holds, two things happen. The wage moves halfway toward a target that rises with labour demand, and staffing is rationed, so every café serves proportionally fewer of the customers it attracted. A café in one corner is squeezed by hiring in the other corner, though the two never share a customer.</p>
+      <div class="eq">target wage = 8 · (workers wanted / pool)<sup>η</sup> &nbsp;&nbsp; profit = (1 − wage/20) · customers served − F</div>
+      <p><strong>Entry and exit.</strong> A café that loses money for as many consecutive periods as its patience allows closes. Each empty square has a chance, set by the entry rate, of attracting a prospective entrant. The entrant estimates what an average café would earn there given current rivals and the current wage, and opens with a probability that rises with that estimate. All squares update at once, and the map wraps at its edges, so no café enjoys a protected corner.</p>
+    </article>
+    <article>
+      <span class="eyebrow">For discussion</span>
+      <h2>Questions for the seminar</h2>
+      <ul>
+        <li>Raise reach from 2 to 8 and hold everything else fixed. What happens to the number of cafés, and to the spacing index? Is either relationship linear? Then run the sweep over R and check whether your eyeball impression survives replication.</li>
+        <li>Use the Tight labour market scenario. Density falls, but does the spatial pattern change? Try to name which outcomes belong to the local mechanism and which to the non-local one. Some outcomes may belong to both, which is a harder thing to show.</li>
+        <li>Run one setting under five different seeds. How much of what you saw in the first run is still there? This is the practical argument for replications before interpreting a simulation.</li>
+        <li>Pause at period 50, then continue to 1000. Which period is the result? Decide on a burn-in window before you look at the output, not after. The sweep uses the last quarter of each run; is that defensible for 100 periods?</li>
+        <li>Change reach mid-run. The system was in some kind of balance, and now it is not. How long does it take to settle again, and does it settle where a fresh run with the new reach would?</li>
+      </ul>
+      <h3 style="margin-top:6px">What the model leaves out</h3>
+      <p>Prices are fixed and identical. Cafés cannot choose quality, hours or size. Workers have no geography of their own, so commuting costs do not exist and one wage holds everywhere. Customers do not move or learn. Each of these is a modelling decision, and each could be relaxed. Before you trust a pattern from this grid, ask which of these omissions it depends on.</p>
+    </article>
+  </section>
+</div>
+
+<script>
+(function(){
+"use strict";
+/* ---------- Model ---------- */
+const C = {D:10, price:1, prod:20, w0:8, outside:0.5, lambda:0.5};
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+function makeKernel(R,beta){
+  const dx=[],dy=[],k=[];const lim=R+0.5;
+  for(let y=-R;y<=R;y++)for(let x=-R;x<=R;x++){const d=Math.hypot(x,y);if(d<=lim){dx.push(x);dy.push(y);k.push(Math.pow(1+d,-beta));}}
+  return {R,beta,dx:Int16Array.from(dx),dy:Int16Array.from(dy),k:Float64Array.from(k),n:dx.length};
+}
+
+function createModel(opts,P){
+  const N=opts.N, NN=N*N, rnd=mulberry32((opts.seed>>>0)||1);
+  const occ=new Uint8Array(NN), attr=new Float64Array(NN), age=new Int32Array(NN), streak=new Int32Array(NN), cid=new Int32Array(NN);
+  const q=new Float64Array(NN), served=new Float64Array(NN), prof=new Float64Array(NN);
+  const den=new Float64Array(NN), domW=new Float64Array(NN), domId=new Int32Array(NN);
+  let nextId=1, wage=C.w0, ration=1, t=0, kernel=null, lastS=0;
+  const hist=[];
+  for(let i=0;i<NN;i++) if(rnd()<opts.density){occ[i]=1;attr[i]=0.6+0.8*rnd();cid[i]=nextId++;}
+
+  function ensureKernel(){ if(!kernel||kernel.R!==P.R||kernel.beta!==P.beta) kernel=makeKernel(P.R,P.beta); }
+  function cafeList(){const a=[];for(let i=0;i<NN;i++) if(occ[i]) a.push(i);return a;}
+  function wrap(x,y){return ((y+N)%N)*N+((x+N)%N);}
+  function shares(cafes){
+    ensureKernel(); const {dx,dy,k,n}=kernel;
+    den.fill(C.outside); domW.fill(0); domId.fill(0);
+    for(const c of cafes){const x=c%N,y=(c/N)|0,a=attr[c],id=cid[c];
+      for(let o=0;o<n;o++){const j=wrap(x+dx[o],y+dy[o]);const w=a*k[o];den[j]+=w;if(w>domW[j]){domW[j]=w;domId[j]=id;}}}
+    let S=0;
+    for(const c of cafes){const x=c%N,y=(c/N)|0,a=attr[c];let qq=0;
+      for(let o=0;o<n;o++){const j=wrap(x+dx[o],y+dy[o]);qq+=C.D*a*k[o]/den[j];}
+      q[c]=qq;S+=qq/C.prod;}
+    lastS=S; return S;
+  }
+  function entrantQ(e){
+    ensureKernel(); const {dx,dy,k,n}=kernel; const x=e%N,y=(e/N)|0; let qq=0;
+    for(let o=0;o<n;o++){const j=wrap(x+dx[o],y+dy[o]);qq+=C.D*k[o]/(den[j]+k[o]);}
+    return qq;
+  }
+  function entrantProfit(e){return (C.price-wage/C.prod)*entrantQ(e)*ration-P.F;}
+  function spacing(){
+    const cafes=cafeList(), n=cafes.length; if(n<2) return null;
+    const half=Math.floor(N/2); let sum=0;
+    for(const c of cafes){const x=c%N,y=(c/N)|0;let best=Infinity;
+      for(let r=1;r<=half;r++){
+        for(let d=-r;d<=r;d++){
+          const pts=[[d,-r],[d,r]]; if(d>-r&&d<r){pts.push([-r,d],[r,d]);}
+          for(const p of pts){ if(occ[wrap(x+p[0],y+p[1])]){const dd=Math.hypot(p[0],p[1]);if(dd<best)best=dd;} }
+        }
+        if(best<=r+1) break;
+      }
+      if(best===Infinity) best=half; sum+=best;}
+    const lam=n/NN; return (sum/n)/(0.5/Math.sqrt(lam));
+  }
+  function step(){
+    const cafes=cafeList(); const S=shares(cafes);
+    const L=Math.max(1,P.labour/100*NN);
+    let target=S>0?C.w0*Math.pow(S/L,P.eta):2;
+    target=Math.min(40,Math.max(2,target));
+    wage=C.lambda*target+(1-C.lambda)*wage;
+    ration=S>L?L/S:1;
+    const margin=C.price-wage/C.prod;
+    let totServed=0,sumProf=0;
+    for(const c of cafes){const s=q[c]*ration;served[c]=s;totServed+=s;const p=margin*s-P.F;prof[c]=p;sumProf+=p;streak[c]=p<0?streak[c]+1:0;age[c]++;}
+    const enter=[];
+    for(let e=0;e<NN;e++){ if(occ[e]) continue; if(rnd()>=P.entry) continue;
+      const est=margin*entrantQ(e)*ration-P.F; if(est>0&&rnd()<Math.min(1,est/P.F)) enter.push(e); }
+    let exits=0;
+    for(const c of cafes){ if(streak[c]>=P.patience){occ[c]=0;exits++;age[c]=0;streak[c]=0;q[c]=0;served[c]=0;prof[c]=0;} }
+    for(const e of enter){occ[e]=1;attr[e]=0.6+0.8*rnd();cid[e]=nextId++;age[e]=0;streak[e]=0;q[e]=0;served[e]=0;prof[e]=0;}
+    t++;
+    let cnt=0,ageSum=0;for(let i=0;i<NN;i++) if(occ[i]){cnt++;ageSum+=age[i];}
+    const rec={t,cafes:cnt,entries:enter.length,exits,wage,tightness:S/L,served:totServed/(NN*C.D),meanProfit:cafes.length?sumProf/cafes.length:0,spacing:spacing(),meanAge:cnt?ageSum/cnt:0};
+    hist.push(rec); return rec;
+  }
+  function refresh(){shares(cafeList());}
+  shares(cafeList());
+  return {N,NN,occ,attr,age,streak,cid,q,served,prof,den,domW,domId,hist,step,refresh,entrantQ,entrantProfit,spacing,
+    get t(){return t;}, get wage(){return wage;}, get ration(){return ration;}, get kernel(){ensureKernel();return kernel;},
+    count(){let n=0;for(let i=0;i<NN;i++) n+=occ[i];return n;}};
+}
+
+/* ---------- Parameters & controls ---------- */
+const DEFAULTS={R:3,beta:1,labour:30,eta:1,F:20,entry:0.01,patience:3};
+const P={...DEFAULTS};
+const CONTROLS=[
+ {g:'g-local',id:'R',label:'Reach',unit:'squares',min:1,max:10,step:1,fmt:v=>v+' sq',help:'How far customers will walk. Cafés compete only for customers inside this radius.'},
+ {g:'g-local',id:'beta',label:'Distance decay β',min:0,max:2,step:0.1,fmt:v=>v.toFixed(1),help:'At 0, customers treat every café within reach the same. Higher values hand more of them to the nearest café.'},
+ {g:'g-labour',id:'labour',label:'Labour pool',min:5,max:80,step:1,fmt:v=>v+' / 100 sq',help:'Workers available per 100 squares, in one regional pool. Every café hires from it, wherever it sits.'},
+ {g:'g-labour',id:'eta',label:'Wage response η',min:0,max:2,step:0.1,fmt:v=>v.toFixed(1),help:'How sharply the wage climbs when cafés want more workers than the pool holds. At 0 the wage stays at 8 and only rationing bites.'},
+ {g:'g-econ',id:'F',label:'Fixed cost F',min:5,max:60,step:1,fmt:v=>v+' / period',help:'Rent and overhead, paid whether or not anyone walks in.'},
+ {g:'g-econ',id:'entry',label:'Entry rate',min:0,max:0.05,step:0.001,fmt:v=>v.toFixed(3),help:'Chance per period that an empty square gets a prospective entrant.'},
+ {g:'g-econ',id:'patience',label:'Exit patience',min:1,max:10,step:1,fmt:v=>v+' periods',help:'Consecutive loss-making periods a café will tolerate before closing.'},
+];
+const $=id=>document.getElementById(id);
+for(const c of CONTROLS){
+  const wrapEl=document.createElement('div');wrapEl.className='ctl';
+  wrapEl.innerHTML=`<div class="row"><label for="p-${c.id}">${c.label}</label><span class="val" id="p-${c.id}-val"></span></div>
+  <input type="range" id="p-${c.id}" min="${c.min}" max="${c.max}" step="${c.step}" value="${P[c.id]}"><span class="help">${c.help}</span>`;
+  $(c.g).appendChild(wrapEl);
+  const inp=wrapEl.querySelector('input'), out=wrapEl.querySelector('.val');
+  c.inp=inp;c.out=out;
+  const upd=()=>{P[c.id]=parseFloat(inp.value);out.textContent=c.fmt(P[c.id]);};
+  inp.addEventListener('input',()=>{upd(); if(c.id==='R'||c.id==='beta'){model.refresh();} if(!running) draw();});
+  upd();
+}
+function setParams(obj){for(const c of CONTROLS){if(obj[c.id]!==undefined){c.inp.value=obj[c.id];P[c.id]=obj[c.id];c.out.textContent=c.fmt(obj[c.id]);}}}
+
+/* ---------- Theme tokens ---------- */
+function hexRgb(h){h=h.replace('#','');if(h.length===3)h=h.split('').map(x=>x+x).join('');const n=parseInt(h,16);return [(n>>16)&255,(n>>8)&255,n&255];}
+let TK=null;
+function readTokens(){const s=getComputedStyle(document.documentElement);const g=n=>s.getPropertyValue(n).trim();
+  const o={};for(const k of ['bg','surface','ink','muted','line','cell','accent','pos','neg']){o[k+'S']=g('--'+k);o[k]=hexRgb(g('--'+k));}
+  const b=o.bg;o.dark=(0.299*b[0]+0.587*b[1]+0.114*b[2])<128;o.mono=g('--mono');TK=o;return o;}
+function lerp(a,b,t){return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];}
+function rgbS(c){return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`;}
+function hsl(h,s,l){s/=100;l/=100;const k=n=>(n+h/30)%12;const a=s*Math.min(l,1-l);const f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));return [255*f(0),255*f(8),255*f(4)];}
+readTokens();
+const mq=matchMedia('(prefers-color-scheme: dark)');
+const retheme=()=>{readTokens();draw(true);};
+mq.addEventListener&&mq.addEventListener('change',retheme);
+new MutationObserver(retheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+/* ---------- State ---------- */
+let model, running=false, view='profit', hover=-1, pinned=-1;
+function T(){return parseInt($('T').value,10);}
+function newModel(){
+  model=createModel({N:parseInt($('N').value,10),density:parseFloat($('density').value),seed:parseInt($('seed').value,10)||1},P);
+  setRunning(false); $('runnote').textContent=''; draw(true);
+}
+
+/* ---------- Map rendering ---------- */
+const cv=$('grid'), ctx=cv.getContext('2d'); const off=document.createElement('canvas'); const octx=off.getContext('2d');
+let img=null;
+function sizeCanvas(c){const dpr=window.devicePixelRatio||1;const w=Math.round(c.clientWidth*dpr),h=Math.round(c.clientHeight*dpr);if(c.width!==w||c.height!==h){c.width=w;c.height=h;}return dpr;}
+function drawMap(){
+  const m=model,N=m.N,tk=TK; sizeCanvas(cv);
+  if(off.width!==N){off.width=N;off.height=N;img=octx.createImageData(N,N);}
+  const d=img.data, L=tk.dark?32:76, S=tk.dark?40:48;
+  for(let i=0;i<m.NN;i++){
+    let col=tk.cell;
+    if(view==='market'&&m.domId[i]){const cap=1-C.outside/m.den[i];col=lerp(tk.cell,hsl((m.domId[i]*137.508)%360,S,L),0.25+0.75*cap);}
+    else if(view==='lost'){const lost=C.outside/m.den[i];col=lerp(tk.cell,tk.neg,Math.pow(lost,1.3)*0.85);}
+    else if(view==='profit'){const cap=1-C.outside/m.den[i];col=lerp(tk.cell,tk.surface,cap*0.55);}
+    d[i*4]=col[0];d[i*4+1]=col[1];d[i*4+2]=col[2];d[i*4+3]=255;
+  }
+  octx.putImageData(img,0,0);
+  const W=cv.width; ctx.imageSmoothingEnabled=false; ctx.clearRect(0,0,W,W); ctx.drawImage(off,0,0,W,W);
+  const cell=W/N, ins=Math.max(0.5,cell*0.13);
+  for(let i=0;i<m.NN;i++){ if(!m.occ[i]) continue; const x=i%N,y=(i/N)|0; let col;
+    if(view==='profit'){ if(m.age[i]===0) col=tk.muted; else {const v=Math.max(-1,Math.min(1,m.prof[i]/(1.5*P.F)));col=v>=0?lerp(tk.muted,tk.pos,0.4+0.6*v):lerp(tk.muted,tk.neg,0.4+0.6*(-v));} }
+    else col=tk.ink;
+    ctx.fillStyle=rgbS(col); ctx.fillRect(x*cell+ins,y*cell+ins,cell-2*ins,cell-2*ins);
+    if(view==='profit'&&m.age[i]===0){ctx.strokeStyle=tk.inkS;ctx.lineWidth=Math.max(1,cell*0.08);ctx.strokeRect(x*cell+ins,y*cell+ins,cell-2*ins,cell-2*ins);}
+  }
+  const sel=pinned>=0?pinned:hover;
+  if(sel>=0&&sel<m.NN){const x=sel%N,y=(sel/N)|0;const cx=(x+0.5)*cell,cy=(y+0.5)*cell;
+    ctx.save();ctx.strokeStyle=tk.accentS;ctx.lineWidth=Math.max(1.5,cell*0.12);ctx.setLineDash([cell*0.6,cell*0.4]);
+    for(const ox of [-W,0,W])for(const oy of [-W,0,W]){ctx.beginPath();ctx.arc(cx+ox,cy+oy,(P.R+0.5)*cell,0,Math.PI*2);ctx.stroke();}
+    ctx.setLineDash([]);ctx.lineWidth=Math.max(1.5,cell*0.14);ctx.strokeRect(x*cell,y*cell,cell,cell);ctx.restore();}
+}
+function legend(){
+  const tk=TK,el=$('legend');
+  if(view==='profit') el.innerHTML=`<span>Loss</span><span class="bar" style="background:linear-gradient(90deg,${tk.negS},${tk.mutedS},${tk.posS})"></span><span>Profit</span><span><span class="sw" style="background:${tk.mutedS};outline:1.5px solid ${tk.inkS}"></span>Just opened</span><span>Lighter ground: customers being served</span>`;
+  else if(view==='market') el.innerHTML=`<span><span class="sw" style="background:${tk.inkS}"></span>Café</span><span>Each colour is the café pulling hardest on that square; paler means more customers stay home.</span>`;
+  else el.innerHTML=`<span><span class="sw" style="background:${tk.inkS}"></span>Café</span><span>Share of customers who buy nothing</span><span class="bar" style="background:linear-gradient(90deg,${tk.cellS},${tk.negS})"></span>`;
+}
+function inspect(){
+  const el=$('inspector'), m=model, sel=pinned>=0?pinned:hover;
+  if(sel<0){el.innerHTML=`<h3>Inspect a square</h3><p class="muted" style="font-size:.85rem;margin-top:4px">Hover over the map, or tap a square to pin it. The ring shows how far that square's customers will walk.</p>`;return;}
+  const x=sel%m.N,y=(sel/m.N)|0, cap=(1-C.outside/m.den[sel])*100, pin=pinned>=0?' · pinned (tap again to release)':'';
+  if(m.occ[sel]){
+    el.innerHTML=`<h3>Café at (${x}, ${y})<span class="muted" style="font-weight:400">${pin}</span></h3><dl>
+    <div><dt>Attractiveness</dt><dd>${m.attr[sel].toFixed(2)}</dd></div>
+    <div><dt>Age</dt><dd>${m.age[sel]} periods</dd></div>
+    <div><dt>Customers attracted</dt><dd>${m.q[sel].toFixed(1)}</dd></div>
+    <div><dt>Customers served</dt><dd>${m.served[sel].toFixed(1)}</dd></div>
+    <div><dt>Staff</dt><dd>${(m.served[sel]/C.prod).toFixed(2)}</dd></div>
+    <div><dt>Profit</dt><dd>${m.age[sel]===0?'opens next period':m.prof[sel].toFixed(1)}</dd></div>
+    <div><dt>Losing streak</dt><dd>${m.streak[sel]} of ${P.patience}</dd></div></dl>`;
+  } else {
+    const est=m.entrantProfit(sel);
+    el.innerHTML=`<h3>Empty square at (${x}, ${y})<span class="muted" style="font-weight:400">${pin}</span></h3><dl>
+    <div><dt>Customers here</dt><dd>${C.D} per period</dd></div>
+    <div><dt>Captured by cafés</dt><dd>${cap.toFixed(0)}%</dd></div>
+    <div><dt>Entrant would attract</dt><dd>${m.entrantQ(sel).toFixed(1)}</dd></div>
+    <div><dt>Entrant's expected profit</dt><dd>${est.toFixed(1)}</dd></div></dl>`;
+  }
+}
+function cellAt(ev){const r=cv.getBoundingClientRect();const N=model.N;const x=Math.floor((ev.clientX-r.left)/r.width*N),y=Math.floor((ev.clientY-r.top)/r.height*N);if(x<0||y<0||x>=N||y>=N)return -1;return y*N+x;}
+cv.addEventListener('pointermove',e=>{if(e.pointerType!=='mouse')return;hover=cellAt(e);if(!running)draw();});
+cv.addEventListener('pointerleave',()=>{hover=-1;if(!running)draw();});
+cv.addEventListener('pointerdown',e=>{const c=cellAt(e);pinned=(pinned===c)?-1:c;if(!running)draw();});
+
+/* ---------- Charts ---------- */
+function niceMax(v){if(!(v>0))return 1;const p=Math.pow(10,Math.floor(Math.log10(v)));const n=v/p;return (n<=1?1:n<=2?2:n<=2.5?2.5:n<=5?5:10)*p;}
+function fmtTick(v,step){return step<1?v.toFixed(step<0.1?2:1):Math.round(v).toString();}
+function axes(c,{xMin,xMax,yMin,yMax,xLabels,ticks=4}){
+  const dpr=sizeCanvas(c),g=c.getContext('2d'),tk=TK;g.setTransform(dpr,0,0,dpr,0,0);
+  const w=c.clientWidth,h=c.clientHeight;g.clearRect(0,0,w,h);
+  const pl=40,pr=10,pt=8,pb=20;const X=v=>pl+(v-xMin)/(xMax-xMin||1)*(w-pl-pr),Y=v=>pt+(1-(v-yMin)/(yMax-yMin||1))*(h-pt-pb);
+  g.font=`11px ${tk.mono}`;g.fillStyle=tk.mutedS;g.strokeStyle=tk.lineS;g.lineWidth=1;g.textBaseline='middle';g.textAlign='right';
+  const step=(yMax-yMin)/ticks;
+  for(let i=0;i<=ticks;i++){const v=yMin+i*step,yy=Math.round(Y(v))+0.5;g.beginPath();g.moveTo(pl,yy);g.lineTo(w-pr,yy);g.stroke();g.fillText(fmtTick(v,step),pl-6,yy);}
+  g.textBaseline='top';
+  const xl=xLabels||[xMin,Math.round((xMin+xMax)/2),xMax].map(v=>[v,String(v)]);
+  xl.forEach(([v,s],i)=>{g.textAlign=xLabels?'center':(i===0?'left':i===xl.length-1?'right':'center');g.fillText(s,X(v),h-pb+5);});
+  return {g,X,Y,w,h,pl,pr,pt,pb};
+}
+function lineChart(c,{series,xMax,yMax,ref}){
+  let mx=0;for(const s of series)for(const v of s.vals)if(v!=null&&v>mx)mx=v;
+  const ym=yMax!=null?Math.max(yMax,niceMax(mx*1.05)):niceMax(mx*1.08);
+  const A=axes(c,{xMin:0,xMax:Math.max(1,xMax),yMin:0,yMax:ym}),g=A.g,tk=TK;
+  if(ref!=null){g.save();g.setLineDash([4,4]);g.strokeStyle=tk.mutedS;g.beginPath();g.moveTo(A.pl,A.Y(ref));g.lineTo(A.w-A.pr,A.Y(ref));g.stroke();g.restore();}
+  for(const s of series){g.strokeStyle=s.color;g.lineWidth=1.6;g.lineJoin='round';g.beginPath();let pen=false,last=null;
+    s.vals.forEach((v,i)=>{if(v==null){pen=false;return;}const x=A.X(i+1),y=A.Y(v);if(pen)g.lineTo(x,y);else{g.moveTo(x,y);pen=true;}last=[x,y];});
+    g.stroke();if(last){g.fillStyle=s.color;g.beginPath();g.arc(last[0],last[1],3,0,Math.PI*2);g.fill();}}
+}
+function drawCharts(){
+  const h=model.hist,tk=TK,xMax=T();
+  lineChart($('c-cafes'),{series:[{vals:h.map(r=>r.cafes),color:tk.inkS}],xMax});
+  lineChart($('c-wage'),{series:[{vals:h.map(r=>r.wage),color:tk.negS}],xMax,yMax:10,ref:C.w0});
+  lineChart($('c-spacing'),{series:[{vals:h.map(r=>r.spacing),color:tk.posS}],xMax,yMax:1.5,ref:1});
+  lineChart($('c-turn'),{series:[{vals:h.map(r=>r.entries),color:tk.posS},{vals:h.map(r=>r.exits),color:tk.negS}],xMax,yMax:5});
+  const last=h[h.length-1];
+  $('n-cafes').textContent=last?last.cafes:model.count();
+  $('n-wage').textContent=last?last.wage.toFixed(2):C.w0.toFixed(2);
+  const sp=last?last.spacing:model.spacing(); $('n-spacing').textContent=sp==null?'–':sp.toFixed(2);
+  $('n-turn').textContent=last?`+${last.entries} / −${last.exits}`:'–';
+}
+
+/* ---------- Draw & loop ---------- */
+function draw(full){drawMap();inspect();if(full!==false){legend();drawCharts();}status();}
+function status(){
+  const m=model,last=m.hist[m.hist.length-1];
+  $('status').textContent=`Period ${m.t} of ${T()} · ${m.count()} cafés`+(last?` · ${Math.round(last.served*100)}% of demand served`:'');
+  $('prog').style.width=Math.min(100,m.t/T()*100)+'%';
+}
+function setRunning(v){running=v;$('run').textContent=v?'Pause':'Run';if(v)requestAnimationFrame(loop);}
+function loop(){
+  if(!running)return;
+  const sp=$('speed').value,target=T();
+  if(sp==='max'){const t0=performance.now();while(model.t<target&&performance.now()-t0<14)model.step();}
+  else{for(let i=0;i<+sp&&model.t<target;i++)model.step();}
+  if(model.t>=target){setRunning(false);$('runnote').textContent='Finished. Raise the periods to continue, or reset.';}
+  draw();
+  if(running)requestAnimationFrame(loop);
+}
+$('run').addEventListener('click',()=>{if(running){setRunning(false);return;}if(model.t>=T()){$('runnote').textContent='Already at the last period. Raise the periods or reset.';return;}$('runnote').textContent='';setRunning(true);});
+$('step').addEventListener('click',()=>{setRunning(false);if(model.t>=T()){$('runnote').textContent='Already at the last period. Raise the periods or reset.';return;}model.step();draw();});
+$('reset').addEventListener('click',newModel);
+$('newseed').addEventListener('click',()=>{$('seed').value=1+Math.floor(Math.random()*99999);newModel();});
+function syncT(v){v=Math.max(1,Math.min(1000,parseInt(v,10)||1));$('T').value=v;$('T-num').value=v;$('T-val').textContent=v;if(model.t<v)$('runnote').textContent='';if(!running)draw();}
+$('T').addEventListener('input',e=>syncT(e.target.value));
+$('T-num').addEventListener('change',e=>syncT(e.target.value));
+$('density').addEventListener('input',e=>{$('density-val').textContent=Math.round(e.target.value*100)+'%';});
+for(const v of ['profit','market','lost']) $('v-'+v).addEventListener('click',()=>{view=v;for(const w of ['profit','market','lost'])$('v-'+w).setAttribute('aria-pressed',w===v);draw();});
+const PRESETS={base:{...DEFAULTS},wide:{...DEFAULTS,R:8},tight:{...DEFAULTS,labour:12,eta:1.5},foot:{...DEFAULTS,beta:0}};
+document.querySelectorAll('[data-preset]').forEach(b=>b.addEventListener('click',()=>{setParams(PRESETS[b.dataset.preset]);newModel();setRunning(true);}));
+let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{draw();drawSweep();},80);});
+
+/* ---------- Copy CSV ---------- */
+function copyText(text,fallbackId){
+  const fb=$(fallbackId);
+  const show=()=>{fb.hidden=false;fb.value=text;fb.focus();fb.select();};
+  try{navigator.clipboard.writeText(text).then(()=>{fb.hidden=true;flash(fallbackId);},show);}catch(e){show();}
+}
+function flash(fid){const b=fid==='run-fallback'?$('copy-run'):$('sw-copy');const o=b.textContent;b.textContent='Copied';setTimeout(()=>b.textContent=o,1400);}
+$('copy-run').addEventListener('click',()=>{
+  const head=`# seed=${$('seed').value} grid=${model.N} R=${P.R} beta=${P.beta} labour=${P.labour} eta=${P.eta} F=${P.F} entry=${P.entry} patience=${P.patience}\n`;
+  const rows=['period,cafes,entries,exits,wage,labour_tightness,demand_served,mean_profit,spacing_index,mean_age'];
+  for(const r of model.hist) rows.push([r.t,r.cafes,r.entries,r.exits,r.wage.toFixed(4),r.tightness.toFixed(4),r.served.toFixed(4),r.meanProfit.toFixed(3),r.spacing==null?'':r.spacing.toFixed(4),r.meanAge.toFixed(2)].join(','));
+  copyText(head+rows.join('\n'),'run-fallback');
+});
+
+/* ---------- Sweep ---------- */
+const SWEEPS={R:{label:'Reach R',key:'R',values:[1,2,3,4,5,6,7,8]},labour:{label:'Labour pool (workers / 100 squares)',key:'labour',values:[10,20,30,40,50,60,70]},beta:{label:'Distance decay β',key:'beta',values:[0,0.5,1,1.5,2]},F:{label:'Fixed cost F',key:'F',values:[10,20,30,40,50]}};
+const OUTCOMES={density:{label:'Cafés per 100 squares'},spacing:{label:'Spacing index',ref:1},wage:{label:'Regional wage',ref:8},served:{label:'Demand served (%)'}};
+let sweep=null, sweeping=false;
+async function runSweep(){
+  if(sweeping)return; sweeping=true; $('sw-run').disabled=true; $('sw-copy').disabled=true;
+  const spec=SWEEPS[$('sw-var').value],reps=+$('sw-reps').value,periods=+$('sw-T').value,base=parseInt($('seed').value,10)||1;
+  const snap={...P},density=parseFloat($('density').value)||0.04;
+  sweep={spec,periods,base,snap,rows:[]};
+  const total=spec.values.length*reps;let done=0;
+  for(const v of spec.values){for(let r=0;r<reps;r++){
+    const P2={...snap,[spec.key]:v},seed=base+r*7919;
+    const m=createModel({N:40,density,seed},P2);const burn=Math.floor(periods*0.75);
+    let acc={density:0,spacing:0,wage:0,served:0,n:0,ns:0};
+    while(m.t<periods){const t0=performance.now();
+      while(m.t<periods&&performance.now()-t0<12){const rec=m.step();
+        if(rec.t>burn){acc.n++;acc.density+=rec.cafes/m.NN*100;acc.wage+=rec.wage;acc.served+=rec.served*100;if(rec.spacing!=null){acc.spacing+=rec.spacing;acc.ns++;}}}
+      $('sw-status').textContent=`Run ${done+1} of ${total}: ${spec.label} = ${v}, seed ${seed}, period ${m.t}`;
+      $('sw-prog').style.width=((done+m.t/periods)/total*100)+'%';
+      await new Promise(res=>setTimeout(res,0));}
+    sweep.rows.push({value:v,rep:r+1,seed,density:acc.density/acc.n,spacing:acc.ns?acc.spacing/acc.ns:null,wage:acc.wage/acc.n,served:acc.served/acc.n});
+    done++; drawSweep();
+  }}
+  $('sw-status').textContent=`Done: ${total} runs, ${periods} periods each, outcomes averaged over periods ${Math.floor(periods*0.75)+1}–${periods}.`;
+  $('sw-prog').style.width='100%'; sweeping=false; $('sw-run').disabled=false; $('sw-copy').disabled=false;
+}
+function drawSweep(){
+  const c=$('sw-canvas'),tk=TK,key=$('sw-out').value,O=OUTCOMES[key];
+  if(!sweep||!sweep.rows.length){const A=axes(c,{xMin:0,xMax:1,yMin:0,yMax:1,xLabels:[]});A.g.fillStyle=tk.mutedS;A.g.textAlign='center';A.g.textBaseline='middle';A.g.font=`13px ${tk.mono}`;A.g.fillText('Choose a parameter and press Run sweep',(A.w+A.pl)/2,A.h/2-10);$('sw-title').textContent='Sweep results';return;}
+  const vals=sweep.spec.values,rows=sweep.rows;
+  $('sw-title').textContent=`${O.label} by ${sweep.spec.label}`;
+  let mx=0;for(const r of rows)if(r[key]!=null&&r[key]>mx)mx=r[key];if(O.ref)mx=Math.max(mx,O.ref);
+  const ym=niceMax(mx*1.08);
+  const A=axes(c,{xMin:-0.5,xMax:vals.length-0.5,yMin:0,yMax:ym,xLabels:vals.map((v,i)=>[i,String(v)])}),g=A.g;
+  if(O.ref){g.save();g.setLineDash([4,4]);g.strokeStyle=tk.mutedS;g.beginPath();g.moveTo(A.pl,A.Y(O.ref));g.lineTo(A.w-A.pr,A.Y(O.ref));g.stroke();g.restore();}
+  const means=[];
+  vals.forEach((v,i)=>{const rs=rows.filter(r=>r.value===v&&r[key]!=null);
+    rs.forEach((r,j)=>{const jit=(rs.length>1?(j/(rs.length-1)-0.5):0)*0.22;g.fillStyle=tk.accentS;g.globalAlpha=0.55;g.beginPath();g.arc(A.X(i+jit),A.Y(r[key]),4,0,Math.PI*2);g.fill();g.globalAlpha=1;});
+    if(rs.length)means.push([i,rs.reduce((s,r)=>s+r[key],0)/rs.length]);});
+  g.strokeStyle=tk.inkS;g.lineWidth=2;g.beginPath();means.forEach(([i,m],k)=>{k?g.lineTo(A.X(i),A.Y(m)):g.moveTo(A.X(i),A.Y(m));});g.stroke();
+  g.fillStyle=tk.inkS;means.forEach(([i,m])=>{g.beginPath();g.arc(A.X(i),A.Y(m),3.5,0,Math.PI*2);g.fill();});
+}
+$('sw-run').addEventListener('click',runSweep);
+$('sw-out').addEventListener('change',drawSweep);
+$('sw-copy').addEventListener('click',()=>{if(!sweep)return;const s=sweep.snap;
+  const head=`# varied=${sweep.spec.key} periods=${sweep.periods} grid=40 burn_in=first 75% held: R=${s.R} beta=${s.beta} labour=${s.labour} eta=${s.eta} F=${s.F} entry=${s.entry} patience=${s.patience}\n`;
+  const rows=[`${sweep.spec.key},replication,seed,cafes_per_100,spacing_index,wage,demand_served_pct`];
+  for(const r of sweep.rows)rows.push([r.value,r.rep,r.seed,r.density.toFixed(3),r.spacing==null?'':r.spacing.toFixed(4),r.wage.toFixed(4),r.served.toFixed(2)].join(','));
+  copyText(head+rows.join('\n'),'sw-fallback');});
+
+/* ---------- Boot ---------- */
+newModel(); drawSweep();
+if(!matchMedia('(prefers-reduced-motion: reduce)').matches) setRunning(true);
+})();
+</script>
+
+</body></html>
